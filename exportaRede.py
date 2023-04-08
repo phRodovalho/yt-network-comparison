@@ -55,9 +55,8 @@ def export_network(net, name, path):
     try:
         # net.show(pathFile)
         # Export the network in HTML
-        export_html = json.dumps(net.get_graph())
-        with open(pathFile, 'w+') as f:
-            f.write(export_html)
+
+        net.generate_html(pathFile, local=True, notebook=False)
         return True
     except Exception as e:
         print(e)
