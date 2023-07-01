@@ -26,7 +26,7 @@ from functionsYT import Youtube
 # Carrega as configurações do arquivo config.ini
 def load_config():
     config = configparser.ConfigParser()
-    config.read("C:\\Users\\pheli\\Desktop\\Comparar redes complexas\\yt-network-comparison\\config.ini")
+    config.read("C:\\Users\\pheli\\Desktop\\Comparar redes complexas\\yt-network-comparison\\Coleta\\config.ini")
     return config
 
 
