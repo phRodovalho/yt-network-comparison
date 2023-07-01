@@ -85,7 +85,7 @@ def export_network_html(net, name, path):
 
 def main():
     # Montagem da rede dos canais a partir dos dados coletados
-    channels = ["ColetaDeDados\\Gustavo Lima", "ColetaDeDados\\Leonardo"]
+    channels = ["ColetaDeDados\\canal-1-gl", "ColetaDeDados\\canal-2-l"]
 
     for pathChannel in channels:
         name = pathChannel.split("\\")[1]
