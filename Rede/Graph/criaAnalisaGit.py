@@ -1,52 +1,24 @@
-
-import networkx as nx
-import pandas as pd
-from pyvis.network import Network
-import scipy.stats as stats
-from tkinter import  *
 import os
 import numpy as np 
+import pandas as pd
+import networkx as nx
+from tkinter import  *
+import scipy.stats as stats
+from pyvis.network import Network
+from sklearn.metrics.pairwise import cosine_similarity
 
-
-def montar_rede(pathChannel, name):
-    pathNodes = pathChannel + "\\Nos.csv"
-    pathEdges = pathChannel + "\\Arestas.csv"
-    graph = nx.DiGraph()
-
-    # read the csv file
-    nodesList = pd.read_csv(pathNodes)
-
-   
-    graph.name = name
+def montar_rede(nodesList, edgesList):
+    graph = nx.Graph()
 
     # adicionando os nos na rede
     for index, row in nodesList.iterrows():
-        graph.add_node(row['Id'], label=row['Label'], title=row['Label'])
-
-    # read the csv file
-    edgesList = pd.read_csv(pathEdges)
+        graph.add_node(row['Id'], label=row['Label'])
 
     # adicionando as arestas na rede
     for index, row in edgesList.iterrows():
         graph.add_edge(row['Source'] , row['Target'], weight=int(row['Profundidade']))
 
     return graph
-
-
-def drawing_network(graph, Network, name):
-    # drawing the network with Pyvis
-    net = Network(notebook=True)
-    # from networkx to pyvis with description
-    net.from_nx(graph)
-    net.show_buttons(filter_=['nodes', 'edges', 'physics', 'layout', 'interaction', 'selection'])
-    net.force_atlas_2based()
-    pathFile = "C:\\Users\\pheli\\Desktop\\Comparar redes complexas\\" + name
-
-    try:
-        net.show(pathFile + "\\" + name + ".html")
-    except:
-        path = createDir(pathFile)
-        net.show(name + ".html")
 
 
 def createDir(nameDir):
@@ -57,6 +29,7 @@ def createDir(nameDir):
     except OSError as error:
         print(error)
         return path
+
 
 def metricas_comunidade(graph):
     # dicionario para salvar as metricas de comunidade
@@ -94,28 +67,17 @@ def metricas_centralidade(graph):
 
     # centralidade de grau
     centralidadeGrau = nx.degree_centrality(graph)
-    # media das centralidades de grau
-    CentralidadeGrau = sum(centralidadeGrau.values()) / len(centralidadeGrau)
-    # normalizando a centralidade de grau com zscore
-    CentralidadeGrau = stats.zscore([CentralidadeGrau])
-    metricasCentralidade['Centralidade-De-Grau'] = CentralidadeGrau
 
     # centralidade de proximidade
     centralidadeProximidade = nx.closeness_centrality(graph)
-    # media das centralidades de proximidade
-    CentralidadeProximidade = sum(centralidadeProximidade.values()) / len(centralidadeProximidade)
-    # normalizando a centralidade de proximidade com zscore
-    CentralidadeProximidade = stats.zscore([CentralidadeProximidade])
-    metricasCentralidade['Centralidade-De-Proximidade'] = CentralidadeProximidade
 
     # centralidade de intermediacao
     centralidadeIntermediacao = nx.betweenness_centrality(graph)
-    # media das centralidades de intermediacao
-    CentralidadeIntermediacao = sum(centralidadeIntermediacao.values()) / len(centralidadeIntermediacao)
-    # normalizando a centralidade de intermediacao com zscore
-    CentralidadeIntermediacao = stats.zscore([CentralidadeIntermediacao])
-    metricasCentralidade['Centralidade-De-Intermediacao'] = CentralidadeIntermediacao
 
+    # para cada no, montar um np.array com as metricas de centralidade e adicionar ao dicionario
+    for node in graph.nodes:
+        metricasCentralidade[node] = np.array([centralidadeGrau[node], centralidadeProximidade[node], centralidadeIntermediacao[node]])
+    
     return metricasCentralidade
 
 
@@ -165,40 +127,68 @@ def distancia_euclidiana(graph1, graph2):
     print(distanciaEuclidianaRede2)
 
 
+def cosine_similarity_sklearn(dictMetricas):
+    # percorrer o dicionario
+    arrayMetricas1 = dictMetricas['UChYkldqKWymAKTsPku_tDfg']
+    arrayMetricas2 = dictMetricas['UCY26QBG77UjscEC6dig8AYw']
+    
+    # Converter os arrays de 1D para uma matriz 2D
+    matrizMetricas = np.vstack((arrayMetricas1, arrayMetricas2))
+
+    # calcular a similaridade de cosseno entre os dois arrays
+    similaridadeCosseno = cosine_similarity(matrizMetricas)
+    print(similaridadeCosseno)
+
+    # salvar em um arquivo txt  
+    file = open("similaridadeCosseno.txt", "w")
+    file.write(str(similaridadeCosseno))
+    file.close()
+
+
+
+
+def carregar_dados(path):
+    pathNodes = path + "\\Nos.csv"
+    pathEdges = path + "\\Arestas.csv"
+
+    nodesList = pd.read_csv(pathNodes)
+    edgesList = pd.read_csv(pathEdges)
+
+    return nodesList, edgesList
+
 
 def main():
-    # Passo 1. Coleta de dados de dois canais do Youtube
-    # execute o script CollectDataCreateNetwork.py para coletar os dados dos canais e criar a rede complexa
-    # CollectDataNetwork.main()
+    # Algoritmo de análise de redes complexas, com o objetivo de comparar redes de canais do YouTube
+    # Passo 1. Acessar os dados dos canais e criar lista de arestas e nós para cada canal
+    nodesCh01, edgesCh01 = carregar_dados("ColetaDeDados\\canal-1-gl")
+    nodesCh02, edgesCh02 = carregar_dados("ColetaDeDados\\canal-2-l")
 
-    # Passo 2. Montagem da rede dos canais a partir dos dados coletados
-    pathChannel01 = "ColetaDeDados\Leonardo"
-    graph1 = montar_rede(pathChannel01, "Leonardo")
+    # Passo 2. Criar um grafo para cada canal
+    graph1 = montar_rede(nodesCh01, edgesCh01)
+    #graph2 = montar_rede(nodesCh02, edgesCh02)
 
-    pathChannel02 = "ColetaDeDados\Gustavo Lima"
-    graph2 = montar_rede(pathChannel02, 'Gustavo Lima')
-
-    # Visualização das redes de cada canal
-    drawing_network(graph1, Network, "Leonardo")
-    drawing_network(graph2, Network, 'Gustavo Lima')
-
-    # Passo 3. Comparação das redes dos canais 1 e 2 por meio de métricas
+    # Passo 3. Comparação das redes dos canais através de métricas
     # Métricas de comunidade (modularidade, densidade, coeficiente de agrupamento)
-    #metricasComunidade1 = metricas_comunidade(graph1)
-    #metricasComunidade2 = metricas_comunidade(graph2)
+    # metricasComunidade1 = metricas_comunidade(graph1)
+    # metricasComunidade2 = metricas_comunidade(graph2)
 
     # Métricas de centralidade (centralidade de grau, centralidade de proximidade)
-    #metricas_centralidade1 = metricas_centralidade(graph1)
+    metricas_centralidade1 = metricas_centralidade(graph1)
     #metricas_centralidade2 = metricas_centralidade(graph2)
 
     # Métricas globais (diametro, raio, densidade)
-    metricas_global1 = metricas_global(graph1)
-    metricas_global2 = metricas_global(graph2)
+    # metricas_global1 = metricas_global(graph1)
+    # metricas_global2 = metricas_global(graph2)
 
     # comparar medida de similaridade entre as redes distancia euclidiana ou similaridade de cosseno
-    distancia_euclidiana(graph1, graph2)
+    # distancia_euclidiana(graph1, graph2)
 
-    # Passo 4. Apresentar o resultado da comparação juntamente com a visualização das redes.
+    # similaridade de cosseno com sklearn
+    cosine_similarity_sklearn(metricas_centralidade1)  
+
+    # Passo 4. Apresentar o resultado da comparação em CSV
+
+
 
 
 
