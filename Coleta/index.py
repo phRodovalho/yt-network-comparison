@@ -108,6 +108,7 @@ def getChannelSubscriptionInfo(youtube, channelInfos):
                 part="contentDetails,id,snippet,subscriberSnippet",
                 channelId=channelInfos[i][1],
                 pageToken=nextPageToken,
+                mySubscribers=True,
                 maxResults=50
             )
             # executando a requisição

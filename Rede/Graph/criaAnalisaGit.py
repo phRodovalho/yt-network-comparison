@@ -76,7 +76,7 @@ def metricas_centralidade(graph):
 
     # para cada no, montar um np.array com as metricas de centralidade e adicionar ao dicionario
     for node in graph.nodes:
-        metricasCentralidade[node] = np.array([centralidadeGrau[node], centralidadeProximidade[node], centralidadeIntermediacao[node]])
+        metricasCentralidade[node] = np.array([[centralidadeGrau[node], centralidadeProximidade[node], centralidadeIntermediacao[node]]])
     
     return metricasCentralidade
 
@@ -132,11 +132,8 @@ def cosine_similarity_sklearn(dictMetricas):
     arrayMetricas1 = dictMetricas['UChYkldqKWymAKTsPku_tDfg']
     arrayMetricas2 = dictMetricas['UCY26QBG77UjscEC6dig8AYw']
     
-    # Converter os arrays de 1D para uma matriz 2D
-    matrizMetricas = np.vstack((arrayMetricas1, arrayMetricas2))
-
     # calcular a similaridade de cosseno entre os dois arrays
-    similaridadeCosseno = cosine_similarity(matrizMetricas)
+    similaridadeCosseno = cosine_similarity(arrayMetricas1, arrayMetricas2)
     print(similaridadeCosseno)
 
     # salvar em um arquivo txt  
