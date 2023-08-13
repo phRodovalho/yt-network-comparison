@@ -62,24 +62,16 @@ def metricas_comunidade(graph):
 
 
 def metricas_centralidade(graph):
-    # dicionario para salvar as metricas de centralidade
     metricasCentralidade = {}
 
     # TODO: pagerank
 
-    # centralidade de grau
     centralidadeGrau = nx.degree_centrality(graph)
-
-    # centralidade de proximidade
     centralidadeProximidade = nx.closeness_centrality(graph, wf_improved=False)
-
-    # centralidade de intermediacao
     centralidadeIntermediacao = nx.betweenness_centrality(graph)
 
-    # para cada no, montar um np.array com as metricas de centralidade e adicionar ao dicionario
     for node in graph.nodes:
         metricasCentralidade[node] = np.array([[centralidadeGrau[node], centralidadeProximidade[node], centralidadeIntermediacao[node]]])
-    
     return metricasCentralidade
 
 
@@ -162,7 +154,6 @@ def remover_nos_folhas(graph):
     return graph
 
 def main():
-    # Algoritmo de análise de redes complexas, com o objetivo de comparar redes de canais do YouTube
     # Passo 1. Acessar os dados dos canais e criar lista de arestas e nós para cada canal
     nodesCh01, edgesCh01 = carregar_dados("ColetaDeDados\\PablloVitar")
     nodesCh02, edgesCh02 = carregar_dados("ColetaDeDados\\GloriaGroove")
@@ -190,7 +181,7 @@ def main():
     # TODO: salvar os grafos em um arquivo .gexf
     # TODO: gerar html com os grafos
 
-    
+
     # TODO: comparar redes de pessoas publicas e pessoas comuns
     # TODO: contar quantidade de pessoas seguidas e as que não per
 
