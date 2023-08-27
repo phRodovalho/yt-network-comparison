@@ -28,34 +28,31 @@ def montar_rede(pathChannel, nameChannel):
     edge_attrs = {
         'NomeCanalSeguidor': edgesList['NomeCanalSeguidor'],
         'NomeCanalSeguido': edgesList['NomeCanalSeguido'],
-        'Descricao': edgesList['Descricao'],
+        #'Descricao': edgesList['Descricao'],
         'DataPublicacao': edgesList['DataPublicacao'],
-        'Profundidade': edgesList['Profundidade'],
+        'Profundidade': edgesList['Profundidade'].astype(int).tolist(),
         'Type': edgesList['Type']
     }
 
-    edges = [(row['Source'], row['Target'], {k: attrs[i] for k, attrs in edge_attrs.items()}) for i, row in edgesList.iterrows()]
+    edges = [
+        (row['Source'], row['Target'], {k: attrs[i] for k, attrs in edge_attrs.items()})
+        for i, row in edgesList.iterrows()
+    ]
     graph.add_edges_from(edges)
-
     return graph
 
 
 def drawing_network(graph):
-    # Draw the network using Pyvis
     net = Network(notebook=False, height="100%", width="100%")
     net.from_nx(graph)
-    net.show_buttons(filter_=['nodes', 'edges', 'physics', 'layout', 'interaction', 'selection'])
+    net.show_buttons(filter_=['selection'])
+    #net.show_buttons(filter_=['nodes', 'edges', 'physics', 'layout', 'interaction', 'selection'])
     net.force_atlas_2based()
-
     return net
 
 def export_network(net, name, path):
     pathFile = path + "\\rede" + name + ".html"
-
     try:
-        # net.show(pathFile)
-        # Export the network in HTML
-
         net.generate_html(pathFile, local=True, notebook=False)
         return True
     except Exception as e:
