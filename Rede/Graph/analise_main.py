@@ -1,16 +1,15 @@
-import configparser
 import os
+import time
+import datetime
 import numpy as np 
+import configparser
 import pandas as pd
 import networkx as nx
-from tkinter import  *
-import scipy.stats as stats
 from pyvis.network import Network
 from sklearn.metrics.pairwise import cosine_similarity
-import datetime
-import time
 
-output_file_path = os.path.join(os.getcwd(), "graph_statistics_total.txt")
+timeFile = datetime.datetime.now().strftime("%d.%m_%Hh%Mm")
+output_file_path = os.path.join(os.getcwd(), "log_execucao_analises_redes_"+ timeFile +"_.txt")
 directory_path = os.path.join(os.getcwd())
 
 def load_config():
@@ -90,7 +89,7 @@ def save_node_edge_stats(channelName, graph, op):
 
 def save_file(msg, metrica):
     with open(output_file_path, "a") as output_file:
-        output_file.write(msg + " {}\n\n".format(metrica))
+        output_file.write(msg + " {}\n".format(metrica))
 
 def remove_leaf_nodes(graph):
     leaf_nodes = [node for node, degree in graph.degree() if degree == 1]
@@ -104,18 +103,24 @@ def cosine_similarity_sklearn(metr_chan1, metr_chan2):
 def get_channel_id(channelName, config):
   return config.get("ids", channelName)
 
+def get_end_time(start_time):
+    end_time = time.time()
+    elapsed_time = (end_time - start_time)/60
+    return elapsed_time
+
 def main():
-    initTime = datetime.datetime.now().strftime("%d/%m/%Y %H:%M")
-    save_file(f"\n\n---- Iniciando Programa em {initTime} ---- ", "")
+    start_time_programa = datetime.datetime.now().strftime("%d/%m/%Y %H:%M")
+    init_time_program = time.time()
+    save_file(f"\n\n---- Iniciando Programa em {start_time_programa} ---- ", "")
 
     config = load_config()
     metricas = {}
 
     for chName, path in config.items("paths"):
-        print(f"Processando canal {chName}...")
-        save_file(f"\n\n---- Iniciando canal {chName} ---- ", "")
+        save_file(f"\n---- Iniciando Processamento do canal {chName} ---- ", "")
+        save_file("---- Criando Grafo, construindo a rede ---- ", "")
+        start_time_processamento = time.time()
 
-        start_time = time.time()
         chId = get_channel_id(chName, config)
         nodes_path, edges_path = get_file_paths(path)
         nodes_list, edges_list = load_data(nodes_path, edges_path)
@@ -124,11 +129,12 @@ def main():
         save_node_edge_stats(chName, graph, -1) 
         remove_leaf_nodes(graph)
         save_node_edge_stats(chName, graph, 1)
-        print(f"Canal {chName} processado!") 
+        save_file(f"\n---- Canal {chName} processado em  {get_end_time(start_time_processamento)} minutos ---- ", "")
         
+        save_file(f"\n---- Iniciando Calculo das métricas, canal {chName} ---- ", "")
+        start_time_metricas = time.time()
         degree = nx.degree_centrality(graph)
         closeness = nx.closeness_centrality(graph, wf_improved=False)
-        print("Closeness calculado")
         between = nx.betweenness_centrality(graph)
         pagerank = nx.pagerank(graph)
         modularity = nx.algorithms.community.modularity(graph, nx.algorithms.community.greedy_modularity_communities(graph))
@@ -136,12 +142,6 @@ def main():
         averClustering = nx.average_clustering(graph)
         num_nodes = graph.number_of_nodes()
         num_edges = graph.number_of_edges()
-        print("Metricas calculadas")
-
-        end_time = time.time()
-        elapsed_time = (end_time - start_time)/60
-        save_file(f"\n\n---- Canal {chName} processado em {elapsed_time:.2f} minutos ---- ", "")
-
         save_file("---- Metricas ---- ", chName)
         save_file("degree_centrality : ", degree[chId])
         save_file("closeness_centrality : ", closeness[chId])
@@ -152,6 +152,7 @@ def main():
         save_file("num_nodes : ", num_nodes)
         save_file("num_edges : ", num_edges)
         save_file("pagerank : ", pagerank[chId])
+        save_file(f"\n---- Canal {chName}, métricas calculadas em  {get_end_time(start_time_metricas)} minutos ---- ", "")
 
         metricas[chName] = np.array([[degree[chId],
                               closeness[chId],
@@ -163,31 +164,24 @@ def main():
                               num_edges,
                               pagerank[chId]]])
         
-        print(f"Gerando arquivos de visualizacao do canal {chName}...")
+        save_file(f"\n---- Gerando arquivos de visualização do canal {chName} ---- ", "")
+        start_time_visualizacao = time.time()
+        time_stamp_files = datetime.datetime.now().strftime("%d_%m_%Y__%Hh%Mm")
         network = drawing_network(graph)
-        time_stamp = datetime.datetime.now().strftime("%d_%m_%Y__%Hh%Mm")
-        export_network_html(network, chName, path, time_stamp)
-        export_network_gexf(graph, chName, path, time_stamp)
+        export_network_html(network, chName, path, time_stamp_files)
+        export_network_gexf(graph, chName, path, time_stamp_files)
+        save_file(f"\n---- Canal {chName}, arquivos de visualização gerados em {get_end_time(start_time_visualizacao)} ---- ", "")
+        save_file(f"\n---- Canal {chName} finalizado em {get_end_time(start_time_processamento)} minutos ---- ", "")
 
-        end_time = time.time()
-        elapsed_time = (end_time - start_time)/60
-        save_file(f"\n\n---- Canal {chName} finalizado em {elapsed_time:.2f} minutos ---- ", "")
-
-        print(f"Canal {chName} finalizado!")
-
-    save_file("\n\n---- Similaridade ---- ", "")
-    print("Calculando similaridade...")
+    save_file("\n---- Iniciando calculo da Similaridade entre todos canais analisados ---- ", "")
     for ch1, metr_chan1 in metricas.items():
         for ch2, metr_chan2 in metricas.items():
             if ch1 != ch2:
                 similaridadeCosseno = cosine_similarity_sklearn(metr_chan1, metr_chan2)
                 save_file("Canal {} e Canal {} : ".format(ch1, ch2), similaridadeCosseno)
-        
-    print("Similaridade calculada!")
-    print("Fim do programa!")
-
-# TODO COLETA: contar quantidade de pessoas seguidas e as que não permitem visualizar
-# TODO COLETA: comparar redes de pessoas publicas e pessoas comuns
+    
+    save_file(f"\n---- Similariadade calculada em {get_end_time(start_time_processamento)} minutos ---- ", "")
+    save_file(f"\n---- Fim do Programa! Execução levou {get_end_time(init_time_program)} minutos ---- ", "")
 
 if __name__ == "__main__":
     main()
