@@ -56,20 +56,26 @@ def collect_channel_data(youtube, channel, depth):
     save_file(f"\n---- Finalizado a coleta!, Iniciando coleta dos canais que o {nameChannel} segue! ---- ")
 
     for i in range(1, depth):
+        start_time_collectChannel = time.time()
         IdChannells = extractNewSourceTarget(networkLevel, i)
         for numCanais, row in IdChannells.iterrows():
-            save_file(f"\n---- Iniciando coleta do canal {row['Source']}, nivel {i + 1} ---- ")
-            start_time_collectChannel = time.time()
+            save_file(f"---- Iniciando coleta do canal {row['Source']}, nivel {i + 1} ---- ")
             networkLevelN = get_channel_subscription_info(youtube, row['Source'], row['SourceId'], i + 1)
             networkLevel = pd.concat([networkLevel, networkLevelN])
-            save_file(f"\n---- Coleta finalizada! ---- ")
-
         save_file(f"\n---- Coleta de nivel {i+1} finalizada em {get_end_time(start_time_collectChannel)} minutos ---- ")
         save_file(f"\n---- Quantidade de canais analisados = {qntCanaisAnalisados} ---- ")
         save_file(f"\n---- Quantidade de canais não analisados = {qntCanaisNaoAnalisados} ---- ")
-        save_file(f"\n Porcentagem de coleta do nivel {i+1} = {round((qntCanaisAnalisados/(qntCanaisAnalisados + qntCanaisNaoAnalisados))*100, 2)}% ")
+        save_file(f"\n {nameChannel} - Porcentagem de coleta do nivel {i+1} = {round((qntCanaisAnalisados/(qntCanaisAnalisados + qntCanaisNaoAnalisados))*100, 2)}% ")
 
     return networkLevel
+
+def get_next_developer_key():
+    global countDevKey
+    config = load_config()
+    developer_key = config['settings']['developer_key'].split(',')
+    youtube = Youtube(developer_key[countDevKey])
+    countDevKey += 1
+    return youtube
 
 def get_channel_subscription_info(youtube, nameChannel, idChannel, level):
     '''
@@ -83,6 +89,7 @@ def get_channel_subscription_info(youtube, nameChannel, idChannel, level):
     global qntCanaisNaoAnalisados
     global countSucess
     global qntCanaisAnalisados
+
     while next:
         request = youtube.youtube.subscriptions().list(
             part="contentDetails,id,snippet,subscriberSnippet",
@@ -96,6 +103,7 @@ def get_channel_subscription_info(youtube, nameChannel, idChannel, level):
             if(e.reason != "The requester is not allowed to access the requested subscriptions."):
                 save_file(f"\n---- Erro ao executar a requisição ---- ")
                 save_file(f"\nDetalhes do erro: {e.reason} ")
+                youtube = get_next_developer_key()
             else:
                 channelData.append({'Source': nameChannel, 'Target': "subscriptionForbidden",
                                     'SourceId': idChannel, 'TargetId': "subscriptionForbidden",
@@ -105,53 +113,57 @@ def get_channel_subscription_info(youtube, nameChannel, idChannel, level):
                 qntCanaisNaoAnalisados += 1
             break
 
-        for j, subscription in enumerate(response['items']):
-            # dados do canal seguido (subscription)
-            if 'snippet' in subscription:
-                snippet = subscription['snippet']
-                subscriptionChannelName = snippet['title']
-                subscriptionChannelId = snippet['resourceId']['channelId']
-                
-                if 'description' in snippet:
-                    subscriptionDescription = snippet['description']
+        try:
+            for j, subscription in enumerate(response['items']):
+                # dados do canal seguido (subscription)
+                if 'snippet' in subscription:
+                    snippet = subscription['snippet']
+                    subscriptionChannelName = snippet['title'] if 'title' in snippet else ""
+                    subscriptionChannelId = snippet['resourceId']['channelId'] if 'resourceId' in snippet else ""
+                    subscriptionDescription = snippet['description'] if 'description' in snippet else ""
+                    subscriptionPublishedAt = snippet['publishedAt'].split('T')[0] if 'publishedAt' in snippet else ""
                 else:
-                    subscriptionDescription = ""
+                    print("Erro ao executar a requisição")
+                    print(f"O canal {nameChannel} não permite visualizar a lista de inscricoes")
+                    qntCanaisNaoAnalisados += 1
+                    break
                 
-                subscriptionPublishedAt = snippet['publishedAt'].split('T')[0]
+                # dados do canal seguidor (subscriber)
+                if 'subscriberSnippet' in subscription:
+                    subscriberSnippet = subscription['subscriberSnippet']
+                    subscriberChannelName = subscriberSnippet['title'] if 'title' in subscriberSnippet else ""
+                    subscriberChannelId = subscriberSnippet['channelId'] if 'channelId' in subscriberSnippet else ""
+                    subscriberDescription = subscriberSnippet['description'] if 'description' in subscriberSnippet else ""
+
+                # associando o canal seguidor com o canal que ele está seguindo
+                channelData.append({'Source': subscriberChannelName, 'Target': subscriptionChannelName,
+                                        'SourceId': subscriberChannelId, 'TargetId': subscriptionChannelId,
+                                        'TargetDescription': subscriptionDescription, 'TargetPublishedAt': subscriptionPublishedAt,
+                                        'Level': level})
+                countSucess += 1
+
+            if 'nextPageToken' in response:
+                next = True
+                nextPageToken = response['nextPageToken']
             else:
-                print("Erro ao executar a requisição")
-                print(f"O canal {nameChannel} não permite visualizar a lista de inscricoes")
-                qntCanaisNaoAnalisados += 1
-                break
-            
-            # dados do canal seguidor (subscriber)
-            if 'subscriberSnippet' in subscription:
-                subscriberSnippet = subscription['subscriberSnippet']
-                subscriberChannelName = subscriberSnippet['title']
-                subscriberChannelId = subscriberSnippet['channelId']
-                subscriberDescription = subscriberSnippet['description']
+                next = False
+                nextPageToken = ''
+                save_file(f"\n O canal {nameChannel} segue {response['pageInfo']['totalResults']} canais ")
+                qntCanaisAnalisados += response['pageInfo']['totalResults']
+        except Exception as e:
+                save_file(f"\n---- Erro ao executar a requisição ---- ")
+                save_file(f"\nDetalhes do erro: {e} ")
 
-            # associando o canal seguidor com o canal que ele está seguindo
-            channelData.append({'Source': subscriberChannelName, 'Target': subscriptionChannelName,
-                                    'SourceId': subscriberChannelId, 'TargetId': subscriptionChannelId,
-                                    'TargetDescription': subscriptionDescription, 'TargetPublishedAt': subscriptionPublishedAt,
-                                    'Level': level})
-            countSucess += 1
-
-        if 'nextPageToken' in response:
-            next = True
-            nextPageToken = response['nextPageToken']
-        else:
-            next = False
-            nextPageToken = ''
-            save_file(f"\n O canal {nameChannel} segue {response['pageInfo']['totalResults']} canais ")
-            qntCanaisAnalisados += response['pageInfo']['totalResults']
-
-    if level == 1: # adiciona o canal inicial como um nó da rede
-        channelData.append({'Source': subscriberChannelName, 'Target': subscriberChannelName,
+        
+    try:
+        if level == 1: # adiciona o canal inicial como um nó da rede
+            channelData.append({'Source': subscriberChannelName, 'Target': subscriberChannelName,
                                         'SourceId': subscriberChannelId, 'TargetId': subscriberChannelId,
                                         'TargetDescription': subscriberDescription, 'TargetPublishedAt': "",
                                         'Level': 0})
+    except Exception as e:
+        save_file(f"\n---- Erro ao executar a requisição ---- ")
+        save_file(f"\nDetalhes do erro: {e} ")
 
     channelDataFrame = pd.DataFrame(channelData)
     return channelDataFrame
@@ -197,7 +209,7 @@ def criaDataFrameArestas(network):
 qntCanaisAnalisados = 0
 countSucess = 0
 qntCanaisNaoAnalisados = 0
-
+countDevKey = 0
 def main():
     start_time_programa = datetime.datetime.now().strftime("%d/%m/%Y %H:%M")
     init_time_program = time.time()
@@ -205,7 +217,7 @@ def main():
     
     
     config = load_config()
-    youtube = Youtube(config['settings']['developer_key'])
+    youtube = get_next_developer_key()
     depth = int(config['settings']['depth'])
 
     for channel_name, channel_link in config['channels'].items():

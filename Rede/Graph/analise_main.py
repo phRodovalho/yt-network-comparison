@@ -7,8 +7,9 @@ import pandas as pd
 import networkx as nx
 from pyvis.network import Network
 from sklearn.metrics.pairwise import cosine_similarity
+import community
 
-timeFile = datetime.datetime.now().strftime("%d.%m_%Hh%Mm")
+timeFile = datetime.datetime.now().strftime("%d.%m_%Hh")
 output_file_path = os.path.join(os.getcwd(), "log_execucao_analises_redes_"+ timeFile +"_.txt")
 directory_path = os.path.join(os.getcwd())
 
@@ -29,30 +30,55 @@ def load_data(pathNodes, pathEdges):
 
 def build_graph(nodes_list, edges_list, channelName):
     graph = nx.Graph(name=channelName)
+
+    nodes_list = nodes_list.dropna()
+    edges_list = edges_list.dropna()
+
     for _, row in nodes_list.iterrows():
-        graph.add_node(row['Id'], label=row['Label'], title=row['Label'])
+        graph.add_node(row['Id'], label=row['Label'])
+    for _, row in edges_list.iterrows():
+        graph.add_edge(row['Source'] , row['Target'])
+    return graph
+
+def build_graph2(nodes_list, edges_list, channelName):
+    graph = nx.Graph(name=channelName)
     
+    nodes_list = nodes_list.dropna()
+    edges_list = edges_list.dropna()
+
+    for _, row in nodes_list.iterrows():
+        graph.add_node(row['Id'], label=row['Id'], title=row['Label'])
+
     edge_attrs = {
         'NomeCanalSeguidor': edges_list['NomeCanalSeguidor'],
         'NomeCanalSeguido': edges_list['NomeCanalSeguido'],
-        #'Descricao': edges_list['Descricao'],
+        'SourceId': edges_list['Source'],
+        'TargetId': edges_list['Target'],
         'DataPublicacao': edges_list['DataPublicacao'],
         'Profundidade': edges_list['Profundidade'].astype(int).tolist(),
-        'Type': edges_list['Type']
     }
-    edges = [
-        (row['Source'], row['Target'], {k: attrs[i] for k, attrs in edge_attrs.items()})
-        for i, row in edges_list.iterrows()
-    ]
+
+    edges = []
+    for i in range(len(edges_list)):
+        if all(isinstance(attr[i], (str, int)) for attr in edge_attrs.values()):
+            edge = (edges_list.iloc[i]['Source'], edges_list.iloc[i]['Target'], {k: edge_attrs[k][i] for k in edge_attrs})
+            edges.append(edge)
+
     graph.add_edges_from(edges)
     return graph
 
 def drawing_network(graph):
     net = Network(notebook=False)
+
+    for node_id in graph.nodes:
+        if str(type(node_id)) != "<class 'str'>":
+            save_file("Possivel ERRO -", "")
+            save_file(str(node_id), str(type(node_id)))
     net.from_nx(graph)
-    net.show_buttons(filter_=['physics','interaction'])
+    net.show_buttons(filter_=['physics', 'interaction'])
     net.force_atlas_2based()
     return net
+
 
 def export_network_gexf(graph, name, path, time_stamp):
     pathFile = os.path.join(path, f"rede_{name}_{time_stamp}_.gexf")
@@ -75,20 +101,20 @@ def save_node_edge_stats(channelName, graph, op):
     formatted_time = datetime.datetime.now().strftime("%d/%m/%Y %H:%M")
     
     if op == -1:
-        with open(output_file_path, "a") as output_file:
+        with open(output_file_path, "a", encoding='utf-8') as output_file:
             output_file.write("\n\n---- {} ----\n".format(formatted_time))
             output_file.write("Canal {}, ANTES de podar os nós folhas\n".format(channelName))
             output_file.write("Número de nós: {}\n".format(num_nodes))
             output_file.write("Número de arestas: {}\n\n".format(num_edges))
     elif op == 1:
-        with open(output_file_path, "a") as output_file:
+        with open(output_file_path, "a", encoding='utf-8') as output_file:
             output_file.write("\n\n---- {} ----\n".format(formatted_time))
             output_file.write("Canal {}, DEPOIS de podar os nós folhas\n".format(channelName))
             output_file.write("Número de nós: {}\n".format(num_nodes))
             output_file.write("Número de arestas: {}\n\n".format(num_edges))
 
 def save_file(msg, metrica):
-    with open(output_file_path, "a") as output_file:
+    with open(output_file_path, "a", encoding='utf-8') as output_file:
         output_file.write(msg + " {}\n".format(metrica))
 
 def remove_leaf_nodes(graph):
@@ -100,8 +126,9 @@ def cosine_similarity_sklearn(metr_chan1, metr_chan2):
     similaridadeCosseno = cosine_similarity(metr_chan1, metr_chan2)
     return similaridadeCosseno
 
-def get_channel_id(channelName, config):
-  return config.get("ids", channelName)
+def get_channel_id(edges_list):
+    chId = edges_list.loc[edges_list['Profundidade'] == 0, 'Source']
+    return chId.values[0]
 
 def get_end_time(start_time):
     end_time = time.time()
@@ -121,9 +148,9 @@ def main():
         save_file("---- Criando Grafo, construindo a rede ---- ", "")
         start_time_processamento = time.time()
 
-        chId = get_channel_id(chName, config)
         nodes_path, edges_path = get_file_paths(path)
         nodes_list, edges_list = load_data(nodes_path, edges_path)
+        chId = get_channel_id(edges_list)
         graph = build_graph(nodes_list, edges_list, chName)
 
         save_node_edge_stats(chName, graph, -1) 
@@ -133,11 +160,12 @@ def main():
         
         save_file(f"\n---- Iniciando Calculo das métricas, canal {chName} ---- ", "")
         start_time_metricas = time.time()
+        partition = community.best_partition(graph)
+        modularity = community.modularity(partition, graph)
         degree = nx.degree_centrality(graph)
         closeness = nx.closeness_centrality(graph, wf_improved=False)
         between = nx.betweenness_centrality(graph)
         pagerank = nx.pagerank(graph)
-        modularity = nx.algorithms.community.modularity(graph, nx.algorithms.community.greedy_modularity_communities(graph))
         density = nx.density(graph)
         averClustering = nx.average_clustering(graph)
         num_nodes = graph.number_of_nodes()
