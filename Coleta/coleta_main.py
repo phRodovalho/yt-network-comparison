@@ -100,7 +100,13 @@ def get_channel_subscription_info(youtube, nameChannel, idChannel, level):
         try:
             response = request.execute()
         except Exception as e:
-            if(e.reason != "The requester is not allowed to access the requested subscriptions."):
+            #verificar se e contem e.reason 
+            if hasattr(e, 'reason') and (e.reason == "The request cannot be completed because you have exceeded your <a href=\"/youtube/v3/getting-started#quota\">quota</a>."):
+                save_file(f"\n---- Erro ao executar a requisição ---- ")
+                save_file(f"\nDetalhes do erro: {e.reason} ")
+                youtube = get_next_developer_key()
+                
+            if(hasattr(e, 'reason') and e.reason != "The requester is not allowed to access the requested subscriptions."):
                 save_file(f"\n---- Erro ao executar a requisição ---- ")
                 save_file(f"\nDetalhes do erro: {e.reason} ")
                 youtube = get_next_developer_key()
@@ -203,8 +209,6 @@ def criaDataFrameArestas(network):
     arestas.columns = ['NomeCanalSeguidor', 'NomeCanalSeguido', 'Source', 'Target', 'TargetDescricao', 'DataPublicacao','Profundidade']
     arestas['Type'] = 'Directed'
     return arestas
-
-# TODO COLETA: comparar redes de pessoas publicas e pessoas comuns
 
 qntCanaisAnalisados = 0
 countSucess = 0
