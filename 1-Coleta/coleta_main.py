@@ -1,5 +1,5 @@
 """
-Coleta de dados de dois canais do Youtube
+Coleta de dados de canais do Youtube
 Estruturado para a partir de um canal inicial coletar os canais de subscription
 e a partir desses canais coletar os canais de subscription e assim por diante
 até atingir a profundidade de busca definida pelo usuário.
